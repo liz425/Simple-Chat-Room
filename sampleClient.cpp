@@ -4,11 +4,13 @@
 #include <sys/time.h>
 #include <sys/types.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string>
 #include <arpa/inet.h>
 #include <netdb.h>
 #include <errno.h>
 #include <unistd.h>
+#include <vector>
 #define MAXLINE 4096
 
 using namespace std;
@@ -26,9 +28,10 @@ typedef struct{
 }SBCPAttrHeader;
 
 int * AttrGen(SBCPAttrHeader* attrHeader, int payloadSize, char* payload){
-    int * attr = malloc(sizeof SBCPAttrHeader + payloadSize);
+    int *attr = (int*)malloc(sizeof(SBCPAttrHeader) + payloadSize);
     attrHeader->length = 4 + payloadSize;
     memcpy(attr, payload, payloadSize);
+    return attr;
 }
 int * SBCPGen(SBCPHeader* header, vector<int*> payloads){
     SBCPHeader* ptr = new SBCPHeader;
@@ -41,8 +44,9 @@ const char *addr = addrStr.c_str();
 void str_cli(FILE *fp, int sockfd);
 
 int main(int argc ,char *argv[]) {
-    SBCPHeader* lala;
-    SBCPGen(lala);
+    SBCPHeader* test1 = new SBCPHeader;
+    vector<int*> test2;
+    SBCPGen(test1, test2);
     int sockfd;
     struct sockaddr_in servaddr;
     
