@@ -11,6 +11,7 @@
 #include <errno.h>
 #include <unistd.h>
 #include <vector>
+#include <iostream>
 #define MAXLINE 4096
 
 using namespace std;
@@ -18,7 +19,9 @@ using namespace std;
 typedef struct{
     // protocol version is 3
     // message type can be 2:JOIN, 3:FWD, 4:SEND
-    uint16_t vrsnType;     
+    // notice that vrsn is 9bits, type is 7bits
+    u_char vrsn;
+    u_char type;     
     uint16_t length;
 }SBCPHeader;
 
@@ -27,15 +30,28 @@ typedef struct{
     uint16_t length;
 }SBCPAttrHeader;
 
-int * AttrGen(SBCPAttrHeader* attrHeader, int payloadSize, char* payload){
-    int *attr = (int*)malloc(sizeof(SBCPAttrHeader) + payloadSize);
+char* AttrGen(SBCPAttrHeader* attrHeader, int payloadSize, char* payload){
+    char *attr = (char*)malloc(sizeof(SBCPAttrHeader) + payloadSize);
     attrHeader->length = 4 + payloadSize;
-    memcpy(attr, payload, payloadSize);
+    memcpy(attr, attrHeader, 4);
+    memcpy(attr + 4, payload, payloadSize);
     return attr;
 }
-int * SBCPGen(SBCPHeader* header, vector<int*> payloads){
-    SBCPHeader* ptr = new SBCPHeader;
-    return (int*)ptr;
+
+char* SBCPGen(SBCPHeader* header, vector<char*> payloads){
+    int payloadsSize = 0;
+    vector<int> sizeVec;
+    for(auto& payload : payloads){
+        sizeVec.push_back(int(payload[2] + (payload[3] << 8)));
+        payloadsSize += sizeVec.back();
+    }
+    char* SBCP = (char*)malloc(sizeof(SBCPHeader) + payloadsSize);
+    header->length = 4 + payloadsSize;
+    memcpy(SBCP, header, 4);
+    for(int i = 0; i < payloads.size(); ++i){
+        memcpy(SBCP + i * 4 + 4, payloads[i], sizeVec[i]);
+    }
+    return SBCP;
 }
 
 in_port_t SERV_PORT = 8888;
@@ -44,9 +60,6 @@ const char *addr = addrStr.c_str();
 void str_cli(FILE *fp, int sockfd);
 
 int main(int argc ,char *argv[]) {
-    SBCPHeader* test1 = new SBCPHeader;
-    vector<int*> test2;
-    SBCPGen(test1, test2);
     int sockfd;
     struct sockaddr_in servaddr;
     
@@ -87,7 +100,11 @@ void str_cli(FILE *fp, int sockfd) {
                     perror("terminated error\n");
             }
             //输出到终端
-            write(fileno(stdout), buf, n);
+            for(int i = 0; i < n; i++){
+                //std::cout << u_char(buf[i]) << std::endl;
+                printf("%x\n", u_char(buf[i]));
+            }
+            //write(fileno(stdout), buf, n);
         }
         //如果有来自终端的输入
         if (FD_ISSET(fileno(fp), &rset)) {
@@ -101,7 +118,22 @@ void str_cli(FILE *fp, int sockfd) {
                 continue;
             }
             //将输入信息发送给服务器
-            write(sockfd, buf, n);	
+            SBCPAttrHeader* attrheader = new SBCPAttrHeader;
+            attrheader->type = 4;
+
+            SBCPHeader* packheader = new SBCPHeader;
+            packheader->vrsn = 1;
+            packheader->type = (1 << 7) + 2;
+            //packheader->type = 0x82;
+            
+            char* attr = AttrGen(attrheader, n, buf);
+            char* SBCP = SBCPGen(packheader, {attr});
+            int lens = int(packheader->length);
+            write(sockfd, SBCP, lens);
+            free(attrheader);
+            free(packheader);
+            free(attr);
+            free(SBCP);
         }
     }
 }
