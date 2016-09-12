@@ -30,32 +30,44 @@ typedef struct{
     uint16_t length;
 }SBCPAttrHeader;
 
-char* AttrGen(SBCPAttrHeader* attrHeader, int payloadSize, char* payload){
+char* AttrGen(uint16_t type, uint16_t payloadSize, char* payload){
     char *attr = (char*)malloc(sizeof(SBCPAttrHeader) + payloadSize);
-    attrHeader->length = 4 + payloadSize;
-    memcpy(attr, attrHeader, 4);
+    SBCPAttrHeader attrheader;
+    attrheader.type = htons(type);
+    attrheader.length = htons(4 + payloadSize);
+    memcpy(attr, &attrheader, 4);
     memcpy(attr + 4, payload, payloadSize);
     return attr;
 }
 
-char* SBCPGen(SBCPHeader* header, vector<char*> payloads){
-    int payloadsSize = 0;
-    vector<int> sizeVec;
+char* SBCPGen(uint16_t version, uint16_t type, vector<char*> payloads, int& length){
+    uint16_t payloadsSize = 0;
+    vector<uint16_t> sizeVec;
     for(auto& payload : payloads){
-        sizeVec.push_back(int(payload[2] + (payload[3] << 8)));
+        SBCPAttrHeader attrheader;
+        memcpy(&attrheader, payload, 4);
+        uint16_t len = ntohs(attrheader.length);
+        sizeVec.push_back(len);
         payloadsSize += sizeVec.back();
     }
     char* SBCP = (char*)malloc(sizeof(SBCPHeader) + payloadsSize);
-    header->length = 4 + payloadsSize;
-    memcpy(SBCP, header, 4);
+    SBCPHeader header;
+    header.vrsn = (version & 0xfffe) >> 1;
+    header.type = ((version & 0x1) << 7) + type;
+    header.length = htons(4 + payloadsSize);
+    //printf("%x\n", header.length);
+    length = payloadsSize + 4;
+    memcpy(SBCP, &header, 4);
     for(int i = 0; i < payloads.size(); ++i){
         memcpy(SBCP + i * 4 + 4, payloads[i], sizeVec[i]);
     }
     return SBCP;
 }
 
+//server ip and port will be overwritten by input arguments
 in_port_t SERV_PORT = 8888;
 string addrStr = "127.0.0.1";
+
 const char *addr = addrStr.c_str();
 void str_cli(FILE *fp, int sockfd);
 
@@ -63,6 +75,15 @@ int main(int argc ,char *argv[]) {
     int sockfd;
     struct sockaddr_in servaddr;
     
+    if(argc != 4){
+        printf("Command arguments ERROR!\n");
+        printf("Usage: ./Client <username> <server_ip> <server_port>\n");
+        return 0;
+    }
+
+    addrStr = string(argv[2]);
+    SERV_PORT = stoi(string(argv[3]));
+
     memset(&servaddr, 0, sizeof servaddr);
     servaddr.sin_family = AF_INET;
     servaddr.sin_port = htons(SERV_PORT);
@@ -117,21 +138,12 @@ void str_cli(FILE *fp, int sockfd) {
                 FD_CLR(fileno(fp), &rset);
                 continue;
             }
-            //将输入信息发送给服务器
-            SBCPAttrHeader* attrheader = new SBCPAttrHeader;
-            attrheader->type = 4;
-
-            SBCPHeader* packheader = new SBCPHeader;
-            packheader->vrsn = 1;
-            packheader->type = (1 << 7) + 2;
-            //packheader->type = 0x82;
             
-            char* attr = AttrGen(attrheader, n, buf);
-            char* SBCP = SBCPGen(packheader, {attr});
-            int lens = int(packheader->length);
+            //send keyborad input to server
+            char* attr = AttrGen(4, n, buf);
+            int lens = 0;
+            char* SBCP = SBCPGen(3, 4, {attr}, lens);
             write(sockfd, SBCP, lens);
-            free(attrheader);
-            free(packheader);
             free(attr);
             free(SBCP);
         }
