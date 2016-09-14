@@ -16,10 +16,6 @@
 
 using namespace std;
 
-#define MAXLINE 4096
-#define JOIN 2
-#define SEND 4
-#define FWD 3
 
 
 //server ip and port will be overwritten by input arguments
@@ -69,6 +65,7 @@ void str_cli(FILE *fp, int sockfd) {
     FD_ZERO(&rset);
     stdineof = 0;
     while(1) {
+        cout<< "I don't believe it." << endl;
         //如果不是已经输入结束,就继续监听终端输入
         if (stdineof == 0) FD_SET(fileno(fp), &rset);
         //监听来自服务器的信息
@@ -76,8 +73,10 @@ void str_cli(FILE *fp, int sockfd) {
         //maxfd设置为sockfd和stdin中较大的一个加1
         maxfd = (fileno(fp) > sockfd ? fileno(fp) : sockfd) + 1;
         //只关心是否有描述符读就绪,其他几个直接传NULL即可
+        cout << "mark 1" << endl;
         select(maxfd, &rset, NULL, NULL, NULL);
-        
+        cout << "mark 2" << endl;
+
         //如果有来自服务器的信息可读
         if (FD_ISSET(sockfd, &rset)) {
             if ((n = read(sockfd, buf, MAXLINE)) == 0) {
@@ -95,6 +94,7 @@ void str_cli(FILE *fp, int sockfd) {
             //write(fileno(stdout), buf, n);
         }
         //如果有来自终端的输入
+        cout << "mark 3" << endl;
         if (FD_ISSET(fileno(fp), &rset)) {
             //终端这边输入了结束符
             if ((n = read(fileno(fp), buf, MAXLINE)) == 0) {
@@ -106,6 +106,7 @@ void str_cli(FILE *fp, int sockfd) {
                 continue;
             }
             
+            cout << "mark 4" << endl;
             //send keyborad input to server
             char* attr = AttrGen(4, n, buf);
             int lens = 0;
