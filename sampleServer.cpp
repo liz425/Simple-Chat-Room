@@ -13,6 +13,8 @@
 
 in_port_t SERV_PORT = 8888;
 
+
+
 int main(int argc ,char *argv[]){
     int i;
     int listenfd, connfd, sockfd;
@@ -43,7 +45,7 @@ int main(int argc ,char *argv[]){
     FD_ZERO(&allset);
     FD_SET(listenfd, &allset);
     
-    for (;;) {
+    while (1) {
         //allset是监控的描述符列表，rset是可读描述符列表
         rset = allset;
         nready = select(maxfd+1, &rset, NULL, NULL, NULL);
