@@ -12,9 +12,14 @@
 #include <unistd.h>
 #include <vector>
 #include <iostream>
-#define MAXLINE 4096
-
 using namespace std;
+
+#define MAXLINE 4096
+#define JOIN 2
+#define SEND 4
+#define FWD 3
+
+
 
 typedef struct{
     // protocol version is 3
@@ -24,6 +29,7 @@ typedef struct{
     u_char type;     
     uint16_t length;
 }SBCPHeader;
+
 
 typedef struct{
     uint16_t type;
@@ -68,7 +74,6 @@ char* SBCPGen(uint16_t version, uint16_t type, vector<char*> payloads, int& leng
 in_port_t SERV_PORT = 8888;
 string addrStr = "127.0.0.1";
 
-const char *addr = addrStr.c_str();
 void str_cli(FILE *fp, int sockfd);
 
 int main(int argc ,char *argv[]) {
@@ -83,6 +88,7 @@ int main(int argc ,char *argv[]) {
 
     addrStr = string(argv[2]);
     SERV_PORT = stoi(string(argv[3]));
+    const char *addr = addrStr.c_str();
 
     memset(&servaddr, 0, sizeof servaddr);
     servaddr.sin_family = AF_INET;
@@ -92,6 +98,15 @@ int main(int argc ,char *argv[]) {
     sockfd = socket(AF_INET, SOCK_STREAM, 0);
     connect(sockfd, (const struct sockaddr *)&servaddr, sizeof servaddr);
     
+    //Initiate a JOIN withe the server using the username 
+    char* attr = AttrGen(2, strlen(argv[1]), argv[1]);
+    int lens = 0;
+    char* SBCP = SBCPGen(3, JOIN, {attr}, lens);
+    write(sockfd, SBCP, lens);
+    free(attr);
+    free(SBCP);
+    
+
     str_cli(stdin, sockfd);
 }
 
@@ -120,10 +135,10 @@ void str_cli(FILE *fp, int sockfd) {
                 else
                     perror("terminated error\n");
             }
-            //输出到终端
+            //out put message 
             for(int i = 0; i < n; i++){
                 //std::cout << u_char(buf[i]) << std::endl;
-                printf("%x\n", u_char(buf[i]));
+                printf("%c\n", u_char(buf[i]));
             }
             //write(fileno(stdout), buf, n);
         }
@@ -142,7 +157,7 @@ void str_cli(FILE *fp, int sockfd) {
             //send keyborad input to server
             char* attr = AttrGen(4, n, buf);
             int lens = 0;
-            char* SBCP = SBCPGen(3, 4, {attr}, lens);
+            char* SBCP = SBCPGen(3, SEND, {attr}, lens);
             write(sockfd, SBCP, lens);
             free(attr);
             free(SBCP);
