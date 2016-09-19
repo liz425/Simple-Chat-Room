@@ -3,8 +3,14 @@ using namespace std;
 
 #define MAXLINE 4096
 #define JOIN 2
-#define SEND 4
 #define FWD 3
+#define SEND 4
+#define NAK 5
+#define OFFLINE 6
+#define ACK 7
+#define ONLINE 8
+#define IDLE 9
+
 
 typedef struct{
     // protocol version is 3
@@ -55,7 +61,7 @@ char* SBCPGen(uint16_t version, uint16_t type, vector<char*> payloads, int& leng
     return SBCP;
 }
 
-vector<char*> unpack(char* SBCP, int& type){
+vector<char*> unpackMessage(char* SBCP, int& type){
     SBCPHeader header;
     memcpy(&header, SBCP, 4);
     int SBCPLen = ntohs(header.length);
@@ -66,14 +72,26 @@ vector<char*> unpack(char* SBCP, int& type){
     if(version != 3)
         return packs;
     int cnt = 4;
+    cout << "SCBPLen: " << SBCPLen << endl;
     while(cnt < SBCPLen){
         SBCPAttrHeader attrheader;
-        memcpy(&attrheader, &SBCPLen + cnt, 4);
+        memcpy(&attrheader, SBCP + cnt, 4);
         int attrLen = ntohs(attrheader.length);
         char* attr = (char*)malloc(attrLen);
-        memcpy(attr, &SBCPLen + cnt, attrLen);
+        memcpy(attr, SBCP + cnt, attrLen);
         packs.push_back(attr);
         cnt += attrLen;
     }
+    cout << "SBCP unpack success." << endl;
     return packs;
+}
+
+char* unpackAttr(char* attr, int& type, int& payloadLen){
+    SBCPAttrHeader header;
+    memcpy(&header, attr, 4);
+    type  = ntohs(header.type);
+    payloadLen = ntohs(header.length) - 4;
+    char* payload = (char*)malloc(payloadLen);
+    memcpy(payload, attr + 4, payloadLen);
+    return payload;
 }

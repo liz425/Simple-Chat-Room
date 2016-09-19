@@ -16,6 +16,18 @@
 
 using namespace std;
 
+//FSM, 
+//state = 0: initial
+//state = 1: waiting for ACK
+//state = 2: ACK received, sending message
+//state = 3: NAK received, then stop
+//state = 4: Error received.
+int state = 0;
+#define INIT 0
+#define WAITACK 1
+#define CHAT 2
+#define STOP 3
+#define ERROR 4
 
 
 //server ip and port will be overwritten by input arguments
@@ -53,7 +65,7 @@ int main(int argc ,char *argv[]) {
     write(sockfd, SBCP, lens);
     free(attr);
     free(SBCP);
-    
+    state = 1;
 
     str_cli(stdin, sockfd);
 }
@@ -65,7 +77,7 @@ void str_cli(FILE *fp, int sockfd) {
     FD_ZERO(&rset);
     stdineof = 0;
     while(1) {
-        cout<< "I don't believe it." << endl;
+        //cout<< "I don't believe it." << endl;
         //如果不是已经输入结束,就继续监听终端输入
         if (stdineof == 0) FD_SET(fileno(fp), &rset);
         //监听来自服务器的信息
@@ -73,28 +85,60 @@ void str_cli(FILE *fp, int sockfd) {
         //maxfd设置为sockfd和stdin中较大的一个加1
         maxfd = (fileno(fp) > sockfd ? fileno(fp) : sockfd) + 1;
         //只关心是否有描述符读就绪,其他几个直接传NULL即可
-        cout << "mark 1" << endl;
+        //cout << "mark 1" << endl;
         select(maxfd, &rset, NULL, NULL, NULL);
-        cout << "mark 2" << endl;
+        //cout << "mark 2" << endl;
 
         //如果有来自服务器的信息可读
         if (FD_ISSET(sockfd, &rset)) {
             if ((n = read(sockfd, buf, MAXLINE)) == 0) {
                 //如果这边输入了EOF之后服务器close掉连接说明正常结束，否则为异常结束
-                if (stdineof == 1)
+                if (stdineof == 1){
+                    printf("Server closed.\n");
                     return;
-                else
-                    perror("terminated error\n");
+                }else{
+                    printf("Terminated error\n");
+                    return;
+                }
             }
+            //unpack SBCPAttrHeader
+            int SBCPType = 0;
+            vector<char*> attrs = unpackMessage(buf, SBCPType);
+            //cout << "Type: " << type << endl;
             //out put message 
+            switch(state){
+                case WAITACK:
+                    if(SBCPType == ACK){
+                        state = SEND;
+                        printf("ACK received.\n");
+                        int attrType = 0;
+                        int payloadLen = 0;
+                        char* payload = unpackAttr(attrs[0], attrType, payloadLen);
+                        int clientCnt = ((uint16_t*)payload)[0];
+                        printf("Client number: %d\n", clientCnt);
+                        break;
+                    }else if(SBCPType == NAK){
+                        state = STOP;
+                        printf("NAK received. QUIT.\n");
+                        return;
+                    }else{
+                        printf("ACK not recognized. QUIT.\n");
+                        return;
+                    }
+                case CHAT:
+
+                default:
+                    break;
+            }
+
             for(int i = 0; i < n; i++){
                 //std::cout << u_char(buf[i]) << std::endl;
-                printf("%c\n", u_char(buf[i]));
+                //printf("%c\n", u_char(buf[i]));
             }
             //write(fileno(stdout), buf, n);
         }
         //如果有来自终端的输入
-        cout << "mark 3" << endl;
+        //cout << "mark 3" << endl;
         if (FD_ISSET(fileno(fp), &rset)) {
             //终端这边输入了结束符
             if ((n = read(fileno(fp), buf, MAXLINE)) == 0) {
@@ -106,7 +150,7 @@ void str_cli(FILE *fp, int sockfd) {
                 continue;
             }
             
-            cout << "mark 4" << endl;
+            //cout << "mark 4 " << endl;
             //send keyborad input to server
             char* attr = AttrGen(4, n, buf);
             int lens = 0;
