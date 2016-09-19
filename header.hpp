@@ -1,4 +1,19 @@
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <sys/select.h>
+#include <sys/time.h>
+#include <sys/types.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string>
+#include <arpa/inet.h>
+#include <netdb.h>
+#include <errno.h>
+#include <unistd.h>
 #include <vector>
+#include <iostream>
+#include <vector>
+#include <unordered_map>
 using namespace std;
 
 #define MAXLINE 4096
@@ -77,6 +92,7 @@ vector<char*> unpackMessage(char* SBCP, int& type){
         SBCPAttrHeader attrheader;
         memcpy(&attrheader, SBCP + cnt, 4);
         int attrLen = ntohs(attrheader.length);
+        cout << "Attribute payload size: " << attrLen - 4 << endl;
         char* attr = (char*)malloc(attrLen);
         memcpy(attr, SBCP + cnt, attrLen);
         packs.push_back(attr);

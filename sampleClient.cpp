@@ -1,28 +1,15 @@
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <sys/select.h>
-#include <sys/time.h>
-#include <sys/types.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string>
-#include <arpa/inet.h>
-#include <netdb.h>
-#include <errno.h>
-#include <unistd.h>
-#include <vector>
-#include <iostream>
 #include "header.hpp"
-
 using namespace std;
 
+
+int state = 0;
 //FSM, 
 //state = 0: initial
 //state = 1: waiting for ACK
 //state = 2: ACK received, sending message
 //state = 3: NAK received, then stop
 //state = 4: Error received.
-int state = 0;
+
 #define INIT 0
 #define WAITACK 1
 #define CHAT 2
@@ -109,24 +96,55 @@ void str_cli(FILE *fp, int sockfd) {
             switch(state){
                 case WAITACK:
                     if(SBCPType == ACK){
-                        state = SEND;
+                        state = CHAT;
                         printf("ACK received.\n");
                         int attrType = 0;
                         int payloadLen = 0;
-                        char* payload = unpackAttr(attrs[0], attrType, payloadLen);
-                        int clientCnt = ((uint16_t*)payload)[0];
-                        printf("Client number: %d\n", clientCnt);
+                        for(int i = 0; i < attrs.size(); ++i){
+                            char* payload = unpackAttr(attrs[i], attrType, payloadLen);
+                            if(i == 0){
+                                int clientCnt = ntohs(((uint16_t*)payload)[0]);
+                                printf("Client number: %d\n", clientCnt);
+                                printf("Clients list: \n");
+                            }else{
+                                for(int j = 0; j < payloadLen; j++){
+                                    printf("%c", u_char(payload[j]));
+                                }
+                                printf("\n");
+                            }
+                        }
+                        printf("-------------------------------------------\n");
                         break;
                     }else if(SBCPType == NAK){
                         state = STOP;
-                        printf("NAK received. QUIT.\n");
+                        printf("NAK received.\nReason: ");
+                        int attrType = 0;
+                        int payloadLen = 0;
+                        char* payload = unpackAttr(attrs[0], attrType, payloadLen);
+                        for(int i = 0; i < payloadLen; i++){
+                            printf("%c", u_char(payload[i]));
+                        }
+                        printf("\nQuit.\n");
                         return;
                     }else{
                         printf("ACK not recognized. QUIT.\n");
                         return;
                     }
                 case CHAT:
+                    if(SBCPType == FWD){
+                        int attrType = 0;
+                        int payloadLen = 0;
+                        for(int i = 0; i < attrs.size(); ++i){
+                            char* payload = unpackAttr(attrs[i], attrType, payloadLen);
+                            for(int j = 0; j < payloadLen; j++){
+                                printf("%c", u_char(payload[j]));
+                            }
+                            if(i == 0)
+                                printf(": ");
+                        }
+                        printf("-------------------------------------------\n");
 
+                    }
                 default:
                     break;
             }
@@ -152,6 +170,7 @@ void str_cli(FILE *fp, int sockfd) {
             
             //cout << "mark 4 " << endl;
             //send keyborad input to server
+            cout << "Input payload size: " << n << endl; 
             char* attr = AttrGen(4, n, buf);
             int lens = 0;
             char* SBCP = SBCPGen(3, SEND, {attr}, lens);
