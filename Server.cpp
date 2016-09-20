@@ -123,15 +123,25 @@ int main(int argc ,char *argv[]){
                     vector<char*> inAttrs = unpackMessage(buf, SBCPType);
                     int attrType = 0;
                     int payloadLen = 0;
-                    char* payload = unpackAttr(inAttrs[0], attrType, payloadLen);
                     
                     vector<char*> outAttrs;
                     int resType = 0;
                     string username;
+                    if(sockToUser.find(sockfd) != sockToUser.end())
+                        username = sockToUser[sockfd];
+
                     char* attr;
                     if(SBCPType == JOIN){
-                        if(userToSock.size() < MAXCLIENTS){
-                            username = string(payload);
+                        //cout << "Start joining" << endl;
+                        if(userToSock.size() < MAXCLIENTS){ 
+                            //cout << "Chatroom not full" << endl;                           
+                            if(!inAttrs.empty()){
+                                char* payload = unpackAttr(inAttrs[0], attrType, payloadLen);
+                                username = string(payload);
+                                //cout << "joined" << endl;
+                                //cout << payload << endl;
+                                //cout << username << endl;
+                            }
                             if(userToSock.find(username) == userToSock.end()){
                                 //broadcast online
                                 char* broadBuf = (char*)username.c_str();
@@ -175,29 +185,38 @@ int main(int argc ,char *argv[]){
                             outAttrs.push_back(attr);
                         }
                     }else if(SBCPType == SEND){
-                        cout << "Received SEND message, FWDing" << endl;
+                        cout << "Received SEND message from \'" + username + "\', FWDing" << endl;
                         resType = FWD;
                         username = sockToUser[sockfd];
                         char* resBuf = (char*)username.c_str();
                         attr = AttrGen(ATTRUSER, username.size(), resBuf);
                         outAttrs = inAttrs;
                         outAttrs.insert(outAttrs.begin(), attr);
+                    }else if(SBCPType == IDLE){
+                        cout << "Client \'" + username + "\' is IDLE, FWDing" << endl;
+                        resType = IDLE;
+                        username = sockToUser[sockfd];
+                        char* resBuf = (char*)username.c_str();
+                        attr = AttrGen(ATTRUSER, username.size(), resBuf);
+                        outAttrs.push_back(attr);
                     }
                     
                     int lens = 0;
                     char* SBCP = SBCPGen(3, resType, outAttrs, lens);
-                    if(resType != FWD){
-                        write(sockfd, SBCP, lens);
-                        for(auto& item : inAttrs){
-                            free(item);
-                        }
-                    }else{
+
+                    if(resType == FWD || resType == IDLE){
                         for(auto& item : sockToUser){
                             if(item.first == sockfd)
                                 continue;
                             write(item.first, SBCP, lens);
                         }
+                    }else{
+                        write(sockfd, SBCP, lens);
+                        for(auto& item : inAttrs){
+                            free(item);
+                        }
                     }
+
                     free(SBCP);
                     for(auto& item : outAttrs){
                         free(item);

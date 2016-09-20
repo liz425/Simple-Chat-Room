@@ -154,7 +154,7 @@ void str_cli(FILE *fp, int sockfd) {
                     if(SBCPType == FWD || SBCPType == ONLINE || SBCPType == OFFLINE || SBCPType == IDLE){
                         int attrType = 0;
                         int payloadLen = 0;
-                        if(SBCPType == ONLINE || SBCPType == OFFLINE){
+                        if(SBCPType == ONLINE || SBCPType == OFFLINE || SBCPType == IDLE){
                             printf("User \'");
                         }
                         for(int i = 0; i < attrs.size(); ++i){
@@ -169,6 +169,8 @@ void str_cli(FILE *fp, int sockfd) {
                             printf("\' is online.\n");
                         }else if(SBCPType == OFFLINE){
                             printf("\' is offline.\n");
+                        }else if(SBCPType == IDLE){
+                            printf("\' is IDLE.\n");
                         }
                         //printf("-------------------------------------------\n");
 
@@ -214,10 +216,15 @@ void str_cli(FILE *fp, int sockfd) {
         //If timer out, set IDLE
         if(FD_ISSET(timerfd, &rset)){
             ssize_t s = read(timerfd, &expTime, sizeof(uint64_t));
-            cout << "Client is IDLE!!!!" << endl;
+            //cout << "Client is IDLE!!!!" << endl;
             new_value.it_value.tv_sec = 0;
             if (timerfd_settime(timerfd, 0, &new_value, NULL) == -1)
                 perror("timerfd_settime");
+     
+            int lens = 0;
+            char* SBCP = SBCPGen(3, IDLE, {}, lens);
+            write(sockfd, SBCP, lens);
+            free(SBCP);
         }
     }
 }

@@ -88,9 +88,10 @@ char* SBCPGen(uint16_t version, uint16_t type, vector<char*> attrs, int& length)
 
 vector<char*> unpackMessage(char* SBCP, int& type){
     SBCPHeader header;
+    vector<char*> packs;
     memcpy(&header, SBCP, 4);
     int SBCPLen = ntohs(header.length);
-    vector<char*> packs;
+    
     
     type = static_cast<int>((header.type) & 0x7f);
     int version = static_cast<int>((header.vrsn << 1) + ((header.type & 0x80) >> 7));
