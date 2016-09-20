@@ -22,6 +22,9 @@ in_port_t SERV_PORT = 8888;
 string addrStr = "127.0.0.1";
 
 void str_cli(FILE *fp, int sockfd);
+int timerfd = timerfd_create(CLOCK_REALTIME, 0);
+struct itimerspec new_value, curr_value;
+uint64_t expTime;
 
 int main(int argc ,char *argv[]) {
     int sockfd;
@@ -54,6 +57,12 @@ int main(int argc ,char *argv[]) {
     free(SBCP);
     state = 1;
 
+    //timer
+    new_value.it_value.tv_sec = 5;
+    new_value.it_value.tv_nsec = 0;
+    new_value.it_interval.tv_sec = 0;
+    new_value.it_interval.tv_nsec = 0;
+
     str_cli(stdin, sockfd);
 }
 
@@ -63,14 +72,21 @@ void str_cli(FILE *fp, int sockfd) {
     char buf[MAXLINE];
     FD_ZERO(&rset);
     stdineof = 0;
+    //setter timer
+    if (timerfd_settime(timerfd, 0, &new_value, NULL) == -1)
+        perror("timerfd_settime");
+    
     while(1) {
         //cout<< "I don't believe it." << endl;
         //如果不是已经输入结束,就继续监听终端输入
-        if (stdineof == 0) FD_SET(fileno(fp), &rset);
-        //监听来自服务器的信息
+        if (stdineof == 0) 
+            FD_SET(fileno(fp), &rset);
+        //listen info from server
         FD_SET(sockfd, &rset);
-        //maxfd设置为sockfd和stdin中较大的一个加1
-        maxfd = (fileno(fp) > sockfd ? fileno(fp) : sockfd) + 1;
+        //listen if timerout
+        FD_SET(timerfd, &rset);
+        //maxfd set to the largest fd + 1
+        maxfd = max(max(fileno(fp), sockfd), timerfd) + 1;
         //只关心是否有描述符读就绪,其他几个直接传NULL即可
         //cout << "mark 1" << endl;
         select(maxfd, &rset, NULL, NULL, NULL);
@@ -179,7 +195,11 @@ void str_cli(FILE *fp, int sockfd) {
                 FD_CLR(fileno(fp), &rset);
                 continue;
             }
-            
+            //reset timer
+            new_value.it_value.tv_sec = 5;
+            if (timerfd_settime(timerfd, 0, &new_value, NULL) == -1)
+                perror("timerfd_settime");
+
             //cout << "mark 4 " << endl;
             //send keyborad input to server
             //cout << "Input payload size: " << n << endl; 
@@ -189,6 +209,15 @@ void str_cli(FILE *fp, int sockfd) {
             write(sockfd, SBCP, lens);
             free(attr);
             free(SBCP);
+        }
+
+        //If timer out, set IDLE
+        if(FD_ISSET(timerfd, &rset)){
+            ssize_t s = read(timerfd, &expTime, sizeof(uint64_t));
+            cout << "Client is IDLE!!!!" << endl;
+            new_value.it_value.tv_sec = 0;
+            if (timerfd_settime(timerfd, 0, &new_value, NULL) == -1)
+                perror("timerfd_settime");
         }
     }
 }
