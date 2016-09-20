@@ -82,9 +82,11 @@ void str_cli(FILE *fp, int sockfd) {
                 //如果这边输入了EOF之后服务器close掉连接说明正常结束，否则为异常结束
                 if (stdineof == 1){
                     printf("Server closed.\n");
+                    close(sockfd);
                     return;
                 }else{
                     printf("Terminated error\n");
+                    close(sockfd);
                     return;
                 }
             }
@@ -125,9 +127,11 @@ void str_cli(FILE *fp, int sockfd) {
                             printf("%c", u_char(payload[i]));
                         }
                         printf("\nQuit.\n");
+                        close(sockfd);
                         return;
                     }else{
                         printf("ACK not recognized. QUIT.\n");
+                        close(sockfd);
                         return;
                     }
                 case CHAT:

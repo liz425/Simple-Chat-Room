@@ -9,7 +9,8 @@ int state = 0;
 in_port_t SERV_PORT = 8888;
 string addrStr = "127.0.0.1";
 
-unordered_map<string, int> user;
+unordered_map<string, int> userToSock;
+unordered_map<int, string> sockToUser;
 
 
 int main(int argc ,char *argv[]){
@@ -32,7 +33,7 @@ int main(int argc ,char *argv[]){
     const char *SERV_ADDR = addrStr.c_str();
     SERV_PORT = stoi(string(argv[2]));
 
-#define MAXCLIENTS argv[3]
+#define MAXCLIENTS atoi(argv[3])
 
 	listenfd = socket(AF_INET, SOCK_STREAM, 0);
 	memset(&servaddr, 0, sizeof servaddr);
@@ -94,13 +95,52 @@ int main(int argc ,char *argv[]){
 					if (n < 0) 
                         perror("read error\n");
 				} else {
-                    switch(state){
-                        case WAITACK:
+                    int SBCPType = 0;
+                    vector<char*> attrs = unpackMessage(buf, SBCPType);
+                    int attrType = 0;
+                    int payloadLen = 0;
+                    char* payload = unpackAttr(attrs[0], attrType, payloadLen);
+                    
+                    vector<char*> outAttrs;
+                    int resType = 0;
 
-                        default:
-                            break;
+                    if(SBCPType == JOIN){
+                        if(userToSock.size() < MAXCLIENTS){
+                            string username = string(payload);
+                            if(userToSock.find(username) == userToSock.end()){
+                                //register user
+                                userToSock[username] = sockfd;
+                                sockToUser[sockfd] = username;
+                                cout << "Client \'" + username + "\' connected." << endl;
+                                //accept with ACK, including user count
+                                resType = ACK;
+                                char* resBuf = (char*)malloc(2);
+                                uint16_t clinum = htons((uint16_t)userToSock.size());
+                                memcpy(resBuf, &clinum, 2);
+                                char* attr = AttrGen(ATTRCLICNT, 2, resBuf);
+                                outAttrs.push_back(attr);
+                                for(auto& user : userToSock){
+                                    string name = user.first;
+                                    char* nameBuf = (char*)name.c_str();
+                                    attr = AttrGen(ATTRUSER, name.size(), nameBuf);
+                                    outAttrs.push_back(attr);
+                                }
+                                
+                            }else{
+                                //refuse with NAK: user already logged in
+                            }
+                        }else{
+                            //refuse with NAK: exceed maximum user number
+                        }
                     }
-					write(sockfd, buf, n);
+                    
+                    int lens = 0;
+                    char* SBCP = SBCPGen(3, resType, outAttrs, lens);
+                    write(sockfd, SBCP, lens);
+                    free(SBCP);
+                    for(auto& item : attrs){
+                        free(item);
+                    }
 				}
 				if (--nready <= 0) break;
 			}

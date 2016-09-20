@@ -26,6 +26,10 @@ using namespace std;
 #define ONLINE 8
 #define IDLE 9
 
+#define ATTRUSER 2
+#define ATTRMESS 4
+#define ATTRREASON 1
+#define ATTRCLICNT 3
 
 typedef struct{
     // protocol version is 3
@@ -52,26 +56,29 @@ char* AttrGen(uint16_t type, uint16_t payloadSize, char* payload){
     return attr;
 }
 
-char* SBCPGen(uint16_t version, uint16_t type, vector<char*> payloads, int& length){
-    uint16_t payloadsSize = 0;
+char* SBCPGen(uint16_t version, uint16_t type, vector<char*> attrs, int& length){
+    uint16_t attrsSize = 0;
     vector<uint16_t> sizeVec;
-    for(auto& payload : payloads){
+    for(auto& attr : attrs){
         SBCPAttrHeader attrheader;
-        memcpy(&attrheader, payload, 4);
+        memcpy(&attrheader, attr, 4);
         uint16_t len = ntohs(attrheader.length);
         sizeVec.push_back(len);
-        payloadsSize += sizeVec.back();
+        attrsSize += sizeVec.back();
+        //cout << "len: " << len << endl;
     }
-    char* SBCP = (char*)malloc(sizeof(SBCPHeader) + payloadsSize);
+    char* SBCP = (char*)malloc(sizeof(SBCPHeader) + attrsSize);
     SBCPHeader header;
     header.vrsn = (version & 0xfffe) >> 1;
     header.type = ((version & 0x1) << 7) + type;
-    header.length = htons(4 + payloadsSize);
+    header.length = htons(4 + attrsSize);
     //printf("%x\n", header.length);
-    length = payloadsSize + 4;
+    length = attrsSize + 4;
     memcpy(SBCP, &header, 4);
-    for(int i = 0; i < payloads.size(); ++i){
-        memcpy(SBCP + i * 4 + 4, payloads[i], sizeVec[i]);
+    int cnt = 4;
+    for(int i = 0; i < attrs.size(); ++i){
+        memcpy(SBCP + cnt, attrs[i], sizeVec[i]);
+        cnt += sizeVec[i];
     }
     return SBCP;
 }
