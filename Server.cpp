@@ -125,12 +125,21 @@ int main(int argc ,char *argv[]){
                                     attr = AttrGen(ATTRUSER, name.size(), nameBuf);
                                     outAttrs.push_back(attr);
                                 }
-                                
                             }else{
                                 //refuse with NAK: user already logged in
+                                resType = NAK;
+                                string tmp = "User \'" + username + "\' already logged in.";
+                                char* resBuf = (char*)tmp.c_str();
+                                char* attr = AttrGen(ATTRREASON, tmp.size(), resBuf);
+                                outAttrs.push_back(attr);
                             }
                         }else{
                             //refuse with NAK: exceed maximum user number
+                            resType = NAK;
+                            string tmp = "Maximum clients limited.";
+                            char* resBuf = (char*)tmp.c_str();
+                            char* attr = AttrGen(ATTRREASON, tmp.size(), resBuf);
+                            outAttrs.push_back(attr);
                         }
                     }
                     
