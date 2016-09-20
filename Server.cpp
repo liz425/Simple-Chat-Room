@@ -96,17 +96,18 @@ int main(int argc ,char *argv[]){
                         perror("read error\n");
 				} else {
                     int SBCPType = 0;
-                    vector<char*> attrs = unpackMessage(buf, SBCPType);
+                    vector<char*> inAttrs = unpackMessage(buf, SBCPType);
                     int attrType = 0;
                     int payloadLen = 0;
-                    char* payload = unpackAttr(attrs[0], attrType, payloadLen);
+                    char* payload = unpackAttr(inAttrs[0], attrType, payloadLen);
                     
                     vector<char*> outAttrs;
                     int resType = 0;
+                    string username;
 
                     if(SBCPType == JOIN){
                         if(userToSock.size() < MAXCLIENTS){
-                            string username = string(payload);
+                            username = string(payload);
                             if(userToSock.find(username) == userToSock.end()){
                                 //register user
                                 userToSock[username] = sockfd;
@@ -141,13 +142,32 @@ int main(int argc ,char *argv[]){
                             char* attr = AttrGen(ATTRREASON, tmp.size(), resBuf);
                             outAttrs.push_back(attr);
                         }
+                    }else if(SBCPType == SEND){
+                        cout << "Received SEND message, FWDing" << endl;
+                        resType = FWD;
+                        username = sockToUser[sockfd];
+                        char* resBuf = (char*)username.c_str();
+                        char* attr = AttrGen(ATTRREASON, username.size(), resBuf);
+                        outAttrs = inAttrs;
+                        outAttrs.insert(outAttrs.begin(), attr);
                     }
                     
                     int lens = 0;
                     char* SBCP = SBCPGen(3, resType, outAttrs, lens);
-                    write(sockfd, SBCP, lens);
+                    if(resType != FWD){
+                        write(sockfd, SBCP, lens);
+                        for(auto& item : inAttrs){
+                            free(item);
+                        }
+                    }else{
+                        for(auto& item : sockToUser){
+                            if(item.first == sockfd)
+                                continue;
+                            write(item.first, SBCP, lens);
+                        }
+                    }
                     free(SBCP);
-                    for(auto& item : attrs){
+                    for(auto& item : outAttrs){
                         free(item);
                     }
 				}

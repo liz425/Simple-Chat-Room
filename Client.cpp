@@ -85,7 +85,7 @@ void str_cli(FILE *fp, int sockfd) {
                     close(sockfd);
                     return;
                 }else{
-                    printf("Terminated error\n");
+                    printf("Server terminated.\n");
                     close(sockfd);
                     return;
                 }

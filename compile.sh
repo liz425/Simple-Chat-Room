@@ -1,2 +1,2 @@
-g++ -std=c++11 sampleClient.cpp -o sampleClient
-g++ -std=c++11 sampleServer.cpp -o sampleServer
+g++ -std=c++11 Client.cpp -o Client
+g++ -std=c++11 Server.cpp -o Server
