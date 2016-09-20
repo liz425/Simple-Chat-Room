@@ -94,18 +94,18 @@ vector<char*> unpackMessage(char* SBCP, int& type){
     if(version != 3)
         return packs;
     int cnt = 4;
-    cout << "SCBPLen: " << SBCPLen << endl;
+    //cout << "SCBPLen: " << SBCPLen << endl;
     while(cnt < SBCPLen){
         SBCPAttrHeader attrheader;
         memcpy(&attrheader, SBCP + cnt, 4);
         int attrLen = ntohs(attrheader.length);
-        cout << "Attribute payload size: " << attrLen - 4 << endl;
+        //cout << "Attribute payload size: " << attrLen - 4 << endl;
         char* attr = (char*)malloc(attrLen);
         memcpy(attr, SBCP + cnt, attrLen);
         packs.push_back(attr);
         cnt += attrLen;
     }
-    cout << "SBCP unpack success." << endl;
+    //cout << "SBCP unpack success." << endl;
     return packs;
 }
 

@@ -13,6 +13,16 @@ unordered_map<string, int> userToSock;
 unordered_map<int, string> sockToUser;
 
 
+void broadcstExcept(int broadType, vector<char*> attrs, vector<int> socks){
+    int lens = 0;
+    char* SBCP = SBCPGen(3, broadType, attrs, lens);
+    for(auto& item : sockToUser){
+        if(find(socks.begin(), socks.end(), item.first) != socks.end())
+            continue;
+        write(item.first, SBCP, lens);
+    }
+}
+
 int main(int argc ,char *argv[]){
 	int i;
 	int listenfd, connfd, sockfd;
@@ -65,10 +75,8 @@ int main(int argc ,char *argv[]){
 			clilen = sizeof cliaddr;
 			connfd = accept(listenfd, (struct sockaddr*)&cliaddr, &clilen);
 			if (connfd == -1){
-                perror("accept error\n");
+                perror("Socket connection error\n");
                 return 0;
-            }else{ 
-                printf("%d accepted!\n", connfd);
             }
 
 			//扫描client数组，找到下标最小的未用的来存客户端描述符
@@ -85,12 +93,28 @@ int main(int argc ,char *argv[]){
 		}
 		//扫描所有的客户端，查看是否有描述符读就绪
 		for (i = 0; i <= maxi; i++) {
-			if ((sockfd = client[i]) < 0) continue;
+			if ((sockfd = client[i]) < 0) 
+                continue;
 			if (FD_ISSET(sockfd, &rset)) {
 				//读到EOF或错误,清除该描述符
 				if ((n = read(sockfd, buf, MAXLINE)) <= 0) {
-					close(sockfd);
+                    //If one user trying to re-login before log off, we force him to logoff
+                    //In that situation, the sockfd is unregistered, so we should NOT send offline info.
+                    if(sockToUser.find(sockfd) == sockToUser.end())
+                        continue;
+                    string username = sockToUser[sockfd];
+                    close(sockfd);
+                    //User lost, unregister this user
 					FD_CLR(sockfd, &allset);
+                    //remove from hashtable
+                    sockToUser.erase(sockfd);
+                    userToSock.erase(username);
+                    cout << "Client \'" + username + "\' left." <<endl;
+                    //broadcast offline
+                    char* broadBuf = (char*)username.c_str();
+                    char* attr = AttrGen(ATTRUSER, username.size(), broadBuf);
+                    broadcstExcept(OFFLINE, {attr}, {});
+
 					client[i] = -1;
 					if (n < 0) 
                         perror("read error\n");
@@ -104,34 +128,42 @@ int main(int argc ,char *argv[]){
                     vector<char*> outAttrs;
                     int resType = 0;
                     string username;
-
+                    char* attr;
                     if(SBCPType == JOIN){
                         if(userToSock.size() < MAXCLIENTS){
                             username = string(payload);
                             if(userToSock.find(username) == userToSock.end()){
-                                //register user
-                                userToSock[username] = sockfd;
-                                sockToUser[sockfd] = username;
+                                //broadcast online
+                                char* broadBuf = (char*)username.c_str();
+                                attr = AttrGen(ATTRUSER, username.size(), broadBuf);
+                                broadcstExcept(ONLINE, {attr}, {});
                                 cout << "Client \'" + username + "\' connected." << endl;
+
                                 //accept with ACK, including user count
                                 resType = ACK;
                                 char* resBuf = (char*)malloc(2);
-                                uint16_t clinum = htons((uint16_t)userToSock.size());
+                                uint16_t clinum = htons((uint16_t)userToSock.size() + 1);
                                 memcpy(resBuf, &clinum, 2);
-                                char* attr = AttrGen(ATTRCLICNT, 2, resBuf);
+                                attr = AttrGen(ATTRCLICNT, 2, resBuf);
                                 outAttrs.push_back(attr);
+                                //broadcast online
                                 for(auto& user : userToSock){
                                     string name = user.first;
                                     char* nameBuf = (char*)name.c_str();
                                     attr = AttrGen(ATTRUSER, name.size(), nameBuf);
                                     outAttrs.push_back(attr);
                                 }
+
+                                //register user
+                                userToSock[username] = sockfd;
+                                sockToUser[sockfd] = username;
+
                             }else{
                                 //refuse with NAK: user already logged in
                                 resType = NAK;
                                 string tmp = "User \'" + username + "\' already logged in.";
                                 char* resBuf = (char*)tmp.c_str();
-                                char* attr = AttrGen(ATTRREASON, tmp.size(), resBuf);
+                                attr = AttrGen(ATTRREASON, tmp.size(), resBuf);
                                 outAttrs.push_back(attr);
                             }
                         }else{
@@ -139,7 +171,7 @@ int main(int argc ,char *argv[]){
                             resType = NAK;
                             string tmp = "Maximum clients limited.";
                             char* resBuf = (char*)tmp.c_str();
-                            char* attr = AttrGen(ATTRREASON, tmp.size(), resBuf);
+                            attr = AttrGen(ATTRREASON, tmp.size(), resBuf);
                             outAttrs.push_back(attr);
                         }
                     }else if(SBCPType == SEND){
@@ -147,7 +179,7 @@ int main(int argc ,char *argv[]){
                         resType = FWD;
                         username = sockToUser[sockfd];
                         char* resBuf = (char*)username.c_str();
-                        char* attr = AttrGen(ATTRREASON, username.size(), resBuf);
+                        attr = AttrGen(ATTRUSER, username.size(), resBuf);
                         outAttrs = inAttrs;
                         outAttrs.insert(outAttrs.begin(), attr);
                     }

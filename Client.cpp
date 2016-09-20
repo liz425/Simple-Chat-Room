@@ -99,23 +99,23 @@ void str_cli(FILE *fp, int sockfd) {
                 case WAITACK:
                     if(SBCPType == ACK){
                         state = CHAT;
-                        printf("ACK received.\n");
+                        //printf("ACK received.\n");
                         int attrType = 0;
                         int payloadLen = 0;
                         for(int i = 0; i < attrs.size(); ++i){
                             char* payload = unpackAttr(attrs[i], attrType, payloadLen);
                             if(i == 0){
                                 int clientCnt = ntohs(((uint16_t*)payload)[0]);
-                                printf("Client number: %d\n", clientCnt);
+                                printf("Clients number: %d\n", clientCnt);
                                 printf("Clients list: \n");
                             }else{
                                 for(int j = 0; j < payloadLen; j++){
                                     printf("%c", u_char(payload[j]));
                                 }
-                                printf("\n");
+                                printf(" | ");
                             }
                         }
-                        printf("-------------------------------------------\n");
+                        printf("\n-------------------------------------------------------\n");
                         break;
                     }else if(SBCPType == NAK){
                         state = STOP;
@@ -135,18 +135,26 @@ void str_cli(FILE *fp, int sockfd) {
                         return;
                     }
                 case CHAT:
-                    if(SBCPType == FWD){
+                    if(SBCPType == FWD || SBCPType == ONLINE || SBCPType == OFFLINE || SBCPType == IDLE){
                         int attrType = 0;
                         int payloadLen = 0;
+                        if(SBCPType == ONLINE || SBCPType == OFFLINE){
+                            printf("User \'");
+                        }
                         for(int i = 0; i < attrs.size(); ++i){
                             char* payload = unpackAttr(attrs[i], attrType, payloadLen);
                             for(int j = 0; j < payloadLen; j++){
                                 printf("%c", u_char(payload[j]));
                             }
-                            if(i == 0)
+                            if(i == 0 && SBCPType == FWD)
                                 printf(": ");
                         }
-                        printf("-------------------------------------------\n");
+                        if(SBCPType == ONLINE){
+                            printf("\' is online.\n");
+                        }else if(SBCPType == OFFLINE){
+                            printf("\' is offline.\n");
+                        }
+                        //printf("-------------------------------------------\n");
 
                     }
                 default:
@@ -174,7 +182,7 @@ void str_cli(FILE *fp, int sockfd) {
             
             //cout << "mark 4 " << endl;
             //send keyborad input to server
-            cout << "Input payload size: " << n << endl; 
+            //cout << "Input payload size: " << n << endl; 
             char* attr = AttrGen(4, n, buf);
             int lens = 0;
             char* SBCP = SBCPGen(3, SEND, {attr}, lens);
