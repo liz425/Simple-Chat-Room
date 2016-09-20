@@ -120,7 +120,7 @@ int main(int argc ,char *argv[]){
                         perror("read error\n");
 				} else {
                     int SBCPType = 0;
-                    vector<char*> inAttrs = unpackMessage(buf, SBCPType);
+                    vector<char*> inAttrs = unpackMessage(buf, n, SBCPType);
                     int attrType = 0;
                     int payloadLen = 0;
                     

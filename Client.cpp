@@ -108,7 +108,7 @@ void str_cli(FILE *fp, int sockfd) {
             }
             //unpack SBCPAttrHeader
             int SBCPType = 0;
-            vector<char*> attrs = unpackMessage(buf, SBCPType);
+            vector<char*> attrs = unpackMessage(buf, n, SBCPType);
             //cout << "Type: " << type << endl;
             //out put message 
             switch(state){
