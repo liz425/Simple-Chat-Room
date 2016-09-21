@@ -50,6 +50,7 @@ int main(int argc ,char *argv[]) {
     
     //Initiate a JOIN withe the server using the username 
     char* attr = AttrGen(2, strlen(argv[1]), argv[1]);
+    //cout << "Username lens: " << strlen(argv[1]) << endl;
     int lens = 0;
     char* SBCP = SBCPGen(3, JOIN, {attr}, lens);
     write(sockfd, SBCP, lens);
@@ -58,7 +59,7 @@ int main(int argc ,char *argv[]) {
     state = 1;
 
     //timer
-    new_value.it_value.tv_sec = 5;
+    new_value.it_value.tv_sec = 10;
     new_value.it_value.tv_nsec = 0;
     new_value.it_interval.tv_sec = 0;
     new_value.it_interval.tv_nsec = 0;
@@ -198,7 +199,7 @@ void str_cli(FILE *fp, int sockfd) {
                 continue;
             }
             //reset timer
-            new_value.it_value.tv_sec = 5;
+            new_value.it_value.tv_sec = 10;
             if (timerfd_settime(timerfd, 0, &new_value, NULL) == -1)
                 perror("timerfd_settime");
 

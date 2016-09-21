@@ -137,8 +137,9 @@ int main(int argc ,char *argv[]){
                             //cout << "Chatroom not full" << endl;                           
                             if(!inAttrs.empty()){
                                 char* payload = unpackAttr(inAttrs[0], attrType, payloadLen);
-                                username = string(payload);
+                                username = string(payload, payloadLen);
                                 //cout << "joined" << endl;
+                                //cout << payloadLen << endl;
                                 //cout << payload << endl;
                                 //cout << username << endl;
                             }
