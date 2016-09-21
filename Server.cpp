@@ -23,6 +23,47 @@ void broadcstExcept(int broadType, vector<char*> attrs, vector<int> socks){
     }
 }
 
+int setupServerSocket(char* host, char * port) {
+    struct addrinfo addrCriteria;
+    struct addrinfo * result = NULL;
+
+    memset(&addrCriteria, 0, sizeof(struct addrinfo));
+    addrCriteria.ai_family = AF_UNSPEC;
+    addrCriteria.ai_socktype = SOCK_STREAM;
+    addrCriteria.ai_flags = AI_PASSIVE;
+
+    int retVal = getaddrinfo(host, port, &addrCriteria, &result);
+    if (result == NULL || retVal!= 0) {
+        fprintf(stderr, "getaddrinfo failed!\n");
+        return -1;
+    }
+
+    for (struct addrinfo * rp = result; rp != NULL; rp = rp->ai_next) {
+
+        int fd = socket(rp->ai_family, rp->ai_socktype, rp->ai_protocol);
+        if (fd == -1) {
+            continue;
+        }
+
+        int retVal = bind(fd, rp->ai_addr, rp->ai_addrlen);
+        if (retVal == 0) {
+            /* bind successfully, return fd */
+            freeaddrinfo(result);
+            return fd;
+        }
+
+        /* close if we cannot bind to the given address */
+        close(fd);
+    }
+
+    fprintf(stderr, "Bind address failed.\n");
+
+    if (result != NULL) {
+        freeaddrinfo(result);
+    }
+    return -1;
+}
+
 int main(int argc ,char *argv[]){
 	int i;
 	int listenfd, connfd, sockfd;
@@ -39,23 +80,29 @@ int main(int argc ,char *argv[]){
         return 0;
     }
 
+    #define MAXCLIENTS atoi(argv[3])
+
+    /** 
+    //support IPv4 only
     addrStr = string(argv[1]);
     const char *SERV_ADDR = addrStr.c_str();
     SERV_PORT = stoi(string(argv[2]));
-
-#define MAXCLIENTS atoi(argv[3])
-
 	listenfd = socket(AF_INET, SOCK_STREAM, 0);
 	memset(&servaddr, 0, sizeof servaddr);
 	servaddr.sin_family = AF_INET;
 	servaddr.sin_port = htons(SERV_PORT);
     inet_pton(AF_INET, SERV_ADDR, &servaddr.sin_addr);
-	
 	int s = ::bind(listenfd, (struct sockaddr*)(&servaddr), sizeof(servaddr));
     if(s != 0)
 		printf("bind error\n");
-    
-	
+    */
+
+    //support both IPv4 and IPv6
+	listenfd = setupServerSocket(argv[1], argv[2]);
+    if(listenfd < 0){
+        printf("Addr bind failed.\n");
+        return -1;
+    }
 	listen(listenfd, 1024);
 	
 	//客户端描述符存储在client中,maxi表示该数组最大的存有客户端描述符的数组下标
@@ -186,7 +233,7 @@ int main(int argc ,char *argv[]){
                             outAttrs.push_back(attr);
                         }
                     }else if(SBCPType == SEND){
-                        cout << "Received SEND message from \'" + username + "\', FWDing" << endl;
+                        //cout << "Received SEND message from \'" + username + "\', FWDing" << endl;
                         resType = FWD;
                         username = sockToUser[sockfd];
                         char* resBuf = (char*)username.c_str();

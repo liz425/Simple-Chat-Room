@@ -26,6 +26,43 @@ int timerfd = timerfd_create(CLOCK_REALTIME, 0);
 struct itimerspec new_value, curr_value;
 uint64_t expTime;
 
+int setupClientSocket(char *host, char* port)  
+{  
+    //配置想要的地址信息  
+    struct addrinfo addrCriteria;  
+    memset(&addrCriteria, 0, sizeof(addrCriteria));  
+    addrCriteria.ai_family = AF_UNSPEC;  
+    addrCriteria.ai_socktype = SOCK_STREAM;  
+    addrCriteria.ai_protocol = IPPROTO_TCP;  
+      
+    struct addrinfo *server_addr;  
+    //获取地址信息  
+    int retVal = getaddrinfo(host, port, &addrCriteria, &server_addr);  
+    if(retVal != 0)  
+        return -1;  
+    int sock=-1;  
+    struct addrinfo *addr = server_addr;  
+    while(addr != NULL)  
+    {  
+        //建立socket  
+        sock = socket(addr->ai_family, addr->ai_socktype, addr->ai_protocol);  
+        if(sock<0)  
+            continue;  
+        if(connect(sock, addr->ai_addr, addr->ai_addrlen) == 0)  
+        {  
+            //链接成功，就中断循环  
+            break;  
+        }  
+        //没有链接成功，就继续尝试下一个  
+        close(sock);  
+        sock = -1;  
+        addr = addr->ai_next;  
+    }  
+    freeaddrinfo(server_addr);  
+    return sock;  
+} 
+
+
 int main(int argc ,char *argv[]) {
     int sockfd;
     struct sockaddr_in servaddr;
@@ -36,18 +73,25 @@ int main(int argc ,char *argv[]) {
         return 0;
     }
 
+    /**
+    //support IPv4 only
     addrStr = string(argv[2]);
     SERV_PORT = stoi(string(argv[3]));
     const char *addr = addrStr.c_str();
-
     memset(&servaddr, 0, sizeof servaddr);
     servaddr.sin_family = AF_INET;
     servaddr.sin_port = htons(SERV_PORT);
     inet_pton(AF_INET, addr, &servaddr.sin_addr);
-    
     sockfd = socket(AF_INET, SOCK_STREAM, 0);
     connect(sockfd, (const struct sockaddr *)&servaddr, sizeof servaddr);
-    
+    */
+
+    //support both IPv4 and IPv6
+    sockfd = setupClientSocket(argv[2], argv[3]); 
+    if(sockfd < 0){
+        printf("Connect to server failed.\n");
+        return -1;
+    }
     //Initiate a JOIN withe the server using the username 
     char* attr = AttrGen(2, strlen(argv[1]), argv[1]);
     //cout << "Username lens: " << strlen(argv[1]) << endl;
