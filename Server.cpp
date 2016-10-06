@@ -105,19 +105,17 @@ int main(int argc ,char *argv[]){
     }
 	listen(listenfd, 1024);
 	
-	//客户端描述符存储在client中,maxi表示该数组最大的存有客户端描述符的数组下标
 	maxfd = listenfd;
 	maxi = -1;
 	memset(client, -1, sizeof client);
-	//初始化读就绪的fd_set数组，并监听listen描述符
+	//initialize fd_set and monitor listen 
 	FD_ZERO(&allset);
 	FD_SET(listenfd, &allset);
 
 	for (;;) {
-		//allset是监控的描述符列表，rset是可读描述符列表
 		rset = allset;
 		nready = select(maxfd+1, &rset, NULL, NULL, NULL);
-		//如果listen描述符可读，说明有客户端连接
+		//if listen is readable, then there must be some clients connected
 		if (FD_ISSET(listenfd, &rset)) {
 			clilen = sizeof cliaddr;
 			connfd = accept(listenfd, (struct sockaddr*)&cliaddr, &clilen);
@@ -126,24 +124,22 @@ int main(int argc ,char *argv[]){
                 return 0;
             }
 
-			//扫描client数组，找到下标最小的未用的来存客户端描述符
+			//find out the minimum free client[i] 
 			for (i = 0; i < FD_SETSIZE; i++) if (client[i] < 0) {
 				client[i] = connfd;
 				break;
 			}
 			if (i == FD_SETSIZE) perror("Too many clients\n");
-			//将客户端描述符放到监视的fd_set中，并更新maxfd和maxi
 			FD_SET(connfd, &allset);
 			if (connfd > maxfd) maxfd = connfd;
 			if (i > maxi) maxi = i;
 			if (--nready <= 0) continue;
 		}
-		//扫描所有的客户端，查看是否有描述符读就绪
+		//scan all the clients
 		for (i = 0; i <= maxi; i++) {
 			if ((sockfd = client[i]) < 0) 
                 continue;
 			if (FD_ISSET(sockfd, &rset)) {
-				//读到EOF或错误,清除该描述符
 				if ((n = read(sockfd, buf, MAXLINE)) <= 0) {
                     //If one user trying to re-login before log off, we force him to logoff
                     //In that situation, the sockfd is unregistered, so we should NOT send offline info.

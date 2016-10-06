@@ -28,7 +28,6 @@ uint64_t expTime;
 
 int setupClientSocket(char *host, char* port)  
 {  
-    //配置想要的地址信息  
     struct addrinfo addrCriteria;  
     memset(&addrCriteria, 0, sizeof(addrCriteria));  
     addrCriteria.ai_family = AF_UNSPEC;  
@@ -36,7 +35,7 @@ int setupClientSocket(char *host, char* port)
     addrCriteria.ai_protocol = IPPROTO_TCP;  
       
     struct addrinfo *server_addr;  
-    //获取地址信息  
+    //get address info
     int retVal = getaddrinfo(host, port, &addrCriteria, &server_addr);  
     if(retVal != 0)  
         return -1;  
@@ -44,16 +43,16 @@ int setupClientSocket(char *host, char* port)
     struct addrinfo *addr = server_addr;  
     while(addr != NULL)  
     {  
-        //建立socket  
+        //set up socket  
         sock = socket(addr->ai_family, addr->ai_socktype, addr->ai_protocol);  
         if(sock<0)  
             continue;  
         if(connect(sock, addr->ai_addr, addr->ai_addrlen) == 0)  
         {  
-            //链接成功，就中断循环  
+            //if connected, then stop 
             break;  
         }  
-        //没有链接成功，就继续尝试下一个  
+        //if not connected, then try the next 
         close(sock);  
         sock = -1;  
         addr = addr->ai_next;  
@@ -123,7 +122,7 @@ void str_cli(FILE *fp, int sockfd) {
     
     while(1) {
         //cout<< "I don't believe it." << endl;
-        //如果不是已经输入结束,就继续监听终端输入
+        //if it is not the end of input, continue to wait and monitor keyboard
         if (stdineof == 0) 
             FD_SET(fileno(fp), &rset);
         //listen info from server
@@ -132,15 +131,15 @@ void str_cli(FILE *fp, int sockfd) {
         FD_SET(timerfd, &rset);
         //maxfd set to the largest fd + 1
         maxfd = max(max(fileno(fp), sockfd), timerfd) + 1;
-        //只关心是否有描述符读就绪,其他几个直接传NULL即可
+
         //cout << "mark 1" << endl;
         select(maxfd, &rset, NULL, NULL, NULL);
         //cout << "mark 2" << endl;
 
-        //如果有来自服务器的信息可读
+        //if there is message from server
         if (FD_ISSET(sockfd, &rset)) {
             if ((n = read(sockfd, buf, MAXLINE)) == 0) {
-                //如果这边输入了EOF之后服务器close掉连接说明正常结束，否则为异常结束
+  		//if EOF, server close normally, if not, server close abnormally
                 if (stdineof == 1){
                     printf("Server closed.\n");
                     close(sockfd);
@@ -230,15 +229,14 @@ void str_cli(FILE *fp, int sockfd) {
             }
             //write(fileno(stdout), buf, n);
         }
-        //如果有来自终端的输入
+        //if input from terminal
         //cout << "mark 3" << endl;
         if (FD_ISSET(fileno(fp), &rset)) {
-            //终端这边输入了结束符
+            //if "enter" is input
             if ((n = read(fileno(fp), buf, MAXLINE)) == 0) {
-                //标记已经输入完毕，并只单端关闭写，因为可能还有消息在来客户端的路上尚未处理 
+                //sign that input is done and close input 
                 stdineof = 1;
                 shutdown(sockfd, SHUT_WR);
-                //不再监听终端输入
                 FD_CLR(fileno(fp), &rset);
                 continue;
             }
